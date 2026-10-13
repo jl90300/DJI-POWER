@@ -7,8 +7,8 @@ headers, base64 HMAC-SHA1) so Home Assistant can fetch a station's local
 The cloud token is used ONCE at setup to read `pair_info.pair_key`, then dropped.
 Daily operation is local BLE only and needs none of this.
 
-Flow: validate_captcha(gRecaptchaResponse) -> captchaTicket -> user_login -> a
-US_ member token -> home-api /users/devices/list -> pair_key.
+Flow: image captcha -> validate_captcha -> captchaTicket -> user_login -> member
+token -> home-api /users/devices/list -> pair_key.
 """
 
 from __future__ import annotations
@@ -30,10 +30,6 @@ HOME_API_HOSTS = (
     "https://home-api-hz.djigate.com",
 )
 DEVICES_PATH = "/app/api/v1/users/devices/list"
-
-# Google reCAPTCHA v2 site key DJI Home uses for app login. NOT domain-locked, so
-# the widget can render on a Home-Assistant-served page.
-RECAPTCHA_SITE_KEY = "6Ld2h4wqAAAAABva7yuX4vbMq34_Rt9_XpsiQkRV"
 
 # Bootstrap HMAC key for Sign-Mc, recovered from the DJI Home Flutter snapshot
 # (object pool pp+0x8e50). DECIDE-LATER: fine for local use; revisit before any
@@ -193,22 +189,6 @@ class DjiCloudClient:
             raise DjiAuthError(code_, "no captchaTicket in response")
         return ticket
 
-    async def exchange_captcha(self, grecaptcha_response: str) -> str:
-        """Exchange a Google reCAPTCHA token for a DJI captchaTicket (fallback)."""
-        body = {
-            "captchaType": "googleCaptcha",
-            "captchaModule": "AppLogin",
-            "gRecaptchaResponse": grecaptcha_response,
-        }
-        resp = await self._post("validate_captcha", body)
-        code = resp.get("code")
-        if code != CODE_OK:
-            raise DjiAuthError(code, resp.get("message", "captcha rejected"))
-        ticket = (resp.get("data") or {}).get("captchaTicket")
-        if not ticket:
-            raise DjiAuthError(code, "no captchaTicket in response")
-        return ticket
-
     async def login(
         self,
         email: str,
@@ -217,7 +197,7 @@ class DjiCloudClient:
         *,
         email_code: str | None = None,
     ) -> str:
-        """Run user_login and return the US_ member token.
+        """Run user_login and return the member token.
 
         Raises DjiTwoFactorRequired if the account needs an email/2-step code,
         DjiRateLimited if code requests are throttled, DjiAuthError otherwise.
@@ -243,9 +223,16 @@ class DjiCloudClient:
             raise DjiRateLimited(resp.get("message", "rate limited"))
         if code != CODE_OK:
             raise DjiAuthError(code, resp.get("message", "login failed"))
-        token = (resp.get("data") or {}).get("token")
-        if not token or not token.startswith("US_"):
-            raise DjiAuthError(code, "no member token in login response")
+        # Only global accounts are known to get a US_ token; China-region logins
+        # do not, so accept any token a successful login returns.
+        data = resp.get("data") or {}
+        token = data.get("token")
+        if not isinstance(token, str) or not token:
+            # Name the returned fields (never their values) to diagnose new shapes.
+            fields = ", ".join(sorted(data)) or "none"
+            raise DjiAuthError(
+                code, f"no member token in login response (fields: {fields})"
+            )
         return token
 
     async def list_devices(self, token: str) -> list[DjiDevice]:
