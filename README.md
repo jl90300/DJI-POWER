@@ -67,7 +67,7 @@ discovered automatically. The setup flow offers three credential paths:
 
 1. **DJI account** — sign in and solve DJI's image captcha. The integration reads the
    station's `pair_key`, then discards the password and member token.
-2. **Existing DJI member token** — use an `x-member-token` once to fetch the key.
+2. **Existing DJI member token** — use an [`x-member-token`](https://github.com/xn0tsa/dji-home-credential-extractor) once to fetch the key.
 3. **Manual pair key** — enter the BLE address and 32-character key directly.
 
 Only the pair key and device metadata are stored. Normal operation is local BLE.
