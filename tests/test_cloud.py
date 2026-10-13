@@ -124,6 +124,45 @@ class CloudTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(image, b"captcha image")
         self.assertEqual(await client.list_devices("US_test"), [])
 
+    async def test_login_accepts_member_tokens_from_any_region(self):
+        for token in ("US_test", "CN_test"):
+            with self.subTest(token=token):
+                payload = {"code": 0, "data": {"token": token}}
+                session = Mock(post=Mock(return_value=response(payload)))
+                client = cloud.DjiCloudClient(session)
+
+                self.assertEqual(
+                    await client.login("test@example.com", "password", "ticket"),
+                    token,
+                )
+
+    async def test_login_without_token_names_fields_but_not_values(self):
+        cases = (
+            (
+                {"user_id": "private id", "cookie_key": "private key"},
+                "cookie_key, user_id",
+            ),
+            ({"token": ""}, "token"),
+            (None, "none"),
+        )
+        for data, fields in cases:
+            with self.subTest(fields=fields):
+                session = Mock(
+                    post=Mock(return_value=response({"code": 0, "data": data}))
+                )
+
+                with self.assertRaises(cloud.DjiAuthError) as caught:
+                    await cloud.DjiCloudClient(session).login(
+                        "test@example.com", "password", "ticket"
+                    )
+
+                self.assertEqual(
+                    str(caught.exception),
+                    "DJI cloud error 0: no member token in login response "
+                    f"(fields: {fields})",
+                )
+                self.assertNotIn("private", str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -338,8 +338,8 @@ class DjiPowerConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Paste an existing DJI x-member-token; fetch the pair_key directly.
 
-        For users who already have a token (e.g. from tools/mem_scrape.py). No
-        login or captcha needed — the token is used once to read the pair_key.
+        For users who already have a token (see the README). No login or captcha
+        needed — the token is used once to read the pair_key.
         """
         errors: dict[str, str] = {}
         if user_input is not None:

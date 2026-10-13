@@ -25,7 +25,7 @@
         "description": "Paste an existing DJI `x-member-token`. It is used once to fetch the local key and is not stored.",
         "data": {
           "address": "Bluetooth address (e.g. AA:BB:CC:DD:EE:FF)",
-          "member_token": "DJI member token (US_...)",
+          "member_token": "DJI member token",
           "name": "Name"
         }
       },
